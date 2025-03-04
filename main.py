@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import shutil
@@ -5,9 +6,10 @@ from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
 
-target_path = "C:\\Users\\ricepotato\\dev\\gallery-maker\\images"
 resized_path = "resized"
 thumbnail_path = "thumbnails"
+
+MAX_WORKERS = 10
 
 
 class FilenameObject:
@@ -28,36 +30,34 @@ def dumps_js(filenames: list[FilenameObject], outpath: pathlib.Path):
         f.write("\n];")
 
 
-def get_file_list(path: pathlib.Path):
-    exts = [".jpg", ".png", ".jpeg", ".tiff", ".webp"]
-    if not path.exists():
-        print(f"Path {path} does not exist")
-        return []
-
-    file_list = list(path.glob("*"))
-    file_list = [file for file in file_list if file.suffix in exts]
-    return file_list
-
-
 def cp_index(path: pathlib.Path):
     shutil.copy("index.html", path / "index.html")
 
 
-def resize_images(path: pathlib.Path, out_path_name: str, height: int):
+def resize_images(target_path: pathlib.Path, out_path_name: str, height: int):
     """
     이미지 높이를 resize. height 로 지정하고 비율에 맞게 너비 조절
     이미지 화질은 높게 유지
     """
 
-    out_path = path / out_path_name
+    out_path = target_path / out_path_name
+
+    image_files = list(
+        filter(
+            lambda x: x.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp"],
+            target_path.glob("*"),
+        )
+    )
+
+    if len(image_files) == 0:
+        print(f"No image files found in {target_path}")
+        return []
+
     if not out_path.exists():
+        print(f"Creating {out_path}")
         out_path.mkdir(parents=True)
 
-    image_files = filter(
-        lambda x: x.suffix in [".jpg", ".png", ".jpeg", ".tiff", ".webp"],
-        path.glob("*"),
-    )
-    with ProcessPoolExecutor(max_workers=5) as executor:
+    with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
             executor.submit(resize_image, file, out_path_name, height)
             for file in image_files
@@ -66,7 +66,7 @@ def resize_images(path: pathlib.Path, out_path_name: str, height: int):
 
 
 def resize_image(file: pathlib.Path, out_path_name: str, height: int):
-    out_path = pathlib.Path(target_path) / out_path_name
+    out_path = file.parent / out_path_name
     img = Image.open(file)
     if img.size[1] < height:
         print(
@@ -85,10 +85,13 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     return f"{out_path_name}/{file.name}"
 
 
-def main():
-    print("Hello, Gallery Maker!")
-    resized_images = resize_images(pathlib.Path(target_path), resized_path, 2160)
-    thumbnail_images = resize_images(pathlib.Path(target_path), thumbnail_path, 250)
+def resize_job(target: str):
+    resized_images = resize_images(pathlib.Path(target), resized_path, 2160)
+    thumbnail_images = resize_images(pathlib.Path(target), thumbnail_path, 250)
+
+    if len(resized_images) <= 0:
+        print(f"No resized images found in {target}")
+        return
 
     file_names = [
         FilenameObject(resized_filepath, thumbnail_filepath)
@@ -96,8 +99,51 @@ def main():
             resized_images, thumbnail_images
         )
     ]
-    dumps_js(file_names, pathlib.Path(target_path) / "files.js")
-    cp_index(pathlib.Path(target_path))
+
+    dumps_js(file_names, pathlib.Path(target) / "files.js")
+    cp_index(pathlib.Path(target))
+
+
+def get_sub_dirs(target: str):
+    target_path = pathlib.Path(target)
+    return list(filter(lambda x: x.is_dir(), target_path.glob("**/*")))
+
+
+def recursive_resize_job(target: str):
+    target_path = pathlib.Path(target)
+    # resize_job(target)
+
+    sub_dirs = get_sub_dirs(target)
+    # for sub_dir in sub_dirs:
+    #     resize_job(str(sub_dir))
+
+
+def main():
+    print("Hello, Gallery Maker!")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-t", "--target", type=str, help="Target directory", required=True
+    )
+    parser.add_argument(
+        "-r",
+        "--recursive",
+        help="Recursive",
+        default=False,
+        action="store_true",
+    )
+
+    args = parser.parse_args()
+
+    if not pathlib.Path(args.target).exists():
+        print(f"Target directory {args.target} does not exist")
+        return
+
+    if not pathlib.Path(args.target).is_dir():
+        print(f"Target {args.target} is not a directory")
+        return
+
+    resize_job(args.target)
 
 
 if __name__ == "__main__":
