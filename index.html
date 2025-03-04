@@ -16,6 +16,8 @@
         display: flex;
         justify-content: center;
         align-items: center;
+        background-color: black;
+        overflow-y: hidden;
       }
       img.img-main {
         max-height: 100%;
@@ -31,8 +33,8 @@
         padding: 10px;
         height: 20px;
         width: 60px;
-        background-color: black;
-        color: white;
+        background-color: white;
+        color: black;
         font-size: 20px;
         display: flex;
         justify-content: center;
@@ -64,12 +66,21 @@
         justify-content: flex-end;
         align-items: center;
       }
-      #btnThumbnailClose {
+      #btnThumbnail {
         width: 50px;
         height: 50px;
         background-color: gray;
         color: white;
         cursor: pointer;
+      }
+      #thumbnail-list img {
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: border-color 0.3s ease;
+      }
+      #thumbnail-list img.active {
+        border-color: #ffffff;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
       }
     </style>
   </head>
@@ -78,19 +89,17 @@
       <img id="mainImg" class="img-main" />
       <div class="page-num"><span id="pageNum">1</span></div>
       <div id="thumbnail-container">
-        <div id="thumbnail-container-header">
-          <button id="btnThumbnailClose">X</button>
-        </div>
+        <div id="thumbnail-container-header"></div>
         <ul id="thumbnail-list"></ul>
       </div>
     </div>
     <script src="files.js"></script>
     <script>
       let index = 0;
+      let isThumbnailOpen = false;
       const total = files.length;
       function init() {
         window.onkeydown = (e) => {
-          console.log(e);
           if (e.key == "PageDown") {
             index += 1;
             if (total - 1 <= index) {
@@ -114,6 +123,10 @@
 
         render();
         renderThumbnails();
+        const button = toogleButton();
+        document
+          .getElementById("thumbnail-container-header")
+          .appendChild(button);
       }
 
       function pageDown() {
@@ -125,6 +138,16 @@
           parseInt(index) + 1
         }/${total}`;
         document.getElementById("mainImg").src = files[index].resized;
+
+        // Update thumbnail active state
+        const thumbnails = document.querySelectorAll("#thumbnail-list img");
+        thumbnails.forEach((thumb, i) => {
+          if (i === index) {
+            thumb.classList.add("active");
+          } else {
+            thumb.classList.remove("active");
+          }
+        });
       }
 
       function renderThumbnails() {
@@ -148,6 +171,29 @@
         const img = new Image();
         img.src = src;
         return img;
+      }
+
+      function toogleButton() {
+        const button = document.createElement("button");
+        button.innerText = "닫기";
+        button.id = "btnThumbnail";
+
+        function hideThumbnail() {
+          document.getElementById("thumbnail-container").style.bottom =
+            "-300px";
+          button.removeEventListener("click", hideThumbnail);
+          button.addEventListener("click", showThumbnail);
+          button.innerText = "열기";
+        }
+
+        function showThumbnail() {
+          document.getElementById("thumbnail-container").style.bottom = "0px";
+          button.removeEventListener("click", showThumbnail);
+          button.addEventListener("click", hideThumbnail);
+          button.innerText = "닫기";
+        }
+        button.addEventListener("click", hideThumbnail);
+        return button;
       }
       init();
     </script>
