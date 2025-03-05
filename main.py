@@ -1,21 +1,21 @@
 import argparse
-import os
 import pathlib
 import shutil
 from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
 
-resized_path = "resized"
-thumbnail_path = "thumbnails"
+RESIZED_PATH = "resized"
+THUMBNAIL_PATH = "thumbnails"
 
 MAX_WORKERS = 10
 
 
 class FilenameObject:
-    def __init__(self, resized: str, thumbnail: str):
+    def __init__(self, resized: str, thumbnail: str, original: str):
         self.resized = resized
         self.thumbnail = thumbnail
+        self.original = original
 
 
 def dumps_js(filenames: list[FilenameObject], outpath: pathlib.Path):
@@ -23,7 +23,7 @@ def dumps_js(filenames: list[FilenameObject], outpath: pathlib.Path):
         f.write("const files = [\n")
         for filename in filenames:
             f.write(
-                f'{{"resized": "{filename.resized}", "thumbnail": "{filename.thumbnail}"}}'
+                f'{{"resized": "{filename.resized}", "thumbnail": "{filename.thumbnail}", "original": "{filename.original}"}}'
             )
             if filename != filenames[-1]:
                 f.write(",\n")
@@ -31,31 +31,23 @@ def dumps_js(filenames: list[FilenameObject], outpath: pathlib.Path):
 
 
 def cp_index(path: pathlib.Path):
-    shutil.copy("index.html", path / "index.html")
+    shutil.copy("gallery.html", path / "gallery.html")
 
 
-def resize_images(target_path: pathlib.Path, out_path_name: str, height: int):
-    """
-    이미지 높이를 resize. height 로 지정하고 비율에 맞게 너비 조절
-    이미지 화질은 높게 유지
-    """
-
-    out_path = target_path / out_path_name
-
-    image_files = list(
+def get_image_files(target_path: pathlib.Path):
+    return list(
         filter(
             lambda x: x.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp"],
             target_path.glob("*"),
         )
     )
 
-    if len(image_files) == 0:
-        print(f"No image files found in {target_path}")
-        return []
 
-    if not out_path.exists():
-        print(f"Creating {out_path}")
-        out_path.mkdir(parents=True)
+def resize_images(image_files: list[pathlib.Path], out_path_name: str, height: int):
+    """
+    이미지 높이를 resize. height 로 지정하고 비율에 맞게 너비 조절
+    이미지 화질은 높게 유지
+    """
 
     with ProcessPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [
@@ -67,11 +59,14 @@ def resize_images(target_path: pathlib.Path, out_path_name: str, height: int):
 
 def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     out_path = file.parent / out_path_name
+    out_filepath = out_path / file.name
+    if out_filepath.exists():
+        print(f"Skipping {file.name} because it already exists")
+        return f"{out_path_name}/{file.name}"
+
     img = Image.open(file)
     if img.size[1] < height:
-        print(
-            f"[{os.getpid()}]Skipping {file.name} because it is smaller than {height}"
-        )
+        print(f"Skipping {file.name} because it is smaller than {height}")
         return file.name
     # Calculate width to maintain aspect ratio
     ratio = height / img.size[1]
@@ -80,23 +75,33 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     resized_image = img.resize((width, height), Image.Resampling.LANCZOS)
     # Save with high quality
     resized_image.save(out_path / file.name, quality=95, optimize=True)
-    print(f"[{os.getpid()}]Resized {file.name} to {out_path / file.name}")
+    print(f"Resized {file.name} to {out_path / file.name}")
 
     return f"{out_path_name}/{file.name}"
 
 
 def resize_job(target: str):
-    resized_images = resize_images(pathlib.Path(target), resized_path, 2160)
-    thumbnail_images = resize_images(pathlib.Path(target), thumbnail_path, 250)
+    images_files = get_image_files(pathlib.Path(target))
+
+    resized_path = pathlib.Path(target) / RESIZED_PATH
+    if not resized_path.exists():
+        resized_path.mkdir(parents=True)
+
+    thumbnail_path = pathlib.Path(target) / THUMBNAIL_PATH
+    if not thumbnail_path.exists():
+        thumbnail_path.mkdir(parents=True)
+
+    resized_images = resize_images(images_files, RESIZED_PATH, 2160)
+    thumbnail_images = resize_images(images_files, THUMBNAIL_PATH, 250)
 
     if len(resized_images) <= 0:
         print(f"No resized images found in {target}")
         return
 
     file_names = [
-        FilenameObject(resized_filepath, thumbnail_filepath)
-        for resized_filepath, thumbnail_filepath in zip(
-            resized_images, thumbnail_images
+        FilenameObject(resized_filepath, thumbnail_filepath, original_filepath.name)
+        for resized_filepath, thumbnail_filepath, original_filepath in zip(
+            resized_images, thumbnail_images, images_files
         )
     ]
 

@@ -167,9 +167,10 @@
         }
       }
 
-      function thumbnailImage(src) {
+      function thumbnailImage(thumbnail) {
         const img = new Image();
-        img.src = src;
+        img.src = thumbnail;
+        img.alt = thumbnail;
         return img;
       }
 
