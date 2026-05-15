@@ -143,7 +143,7 @@
         flex: 1;
         padding: 8px 12px 12px;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(var(--grid-item-size, 180px), 1fr));
         gap: 6px;
         align-content: start;
       }
@@ -272,6 +272,16 @@
       const total = files.length;
       const folderList = typeof folders !== "undefined" ? folders : [];
 
+      const GRID_SIZE_MIN = 80;
+      const GRID_SIZE_MAX = 400;
+      const GRID_SIZE_STEP = 30;
+      let gridItemSize = 180;
+
+      function setGridSize(size) {
+        gridItemSize = Math.min(GRID_SIZE_MAX, Math.max(GRID_SIZE_MIN, size));
+        document.getElementById("grid-list").style.setProperty("--grid-item-size", gridItemSize + "px");
+      }
+
       function init() {
         if (total > 0) {
           window.onkeydown = (e) => {
@@ -289,11 +299,24 @@
               render();
             } else if (e.key === "Escape") {
               closeGrid();
+            } else if (e.key === "+" || e.key === "=") {
+              if (document.getElementById("grid-overlay").classList.contains("open"))
+                setGridSize(gridItemSize + GRID_SIZE_STEP);
+            } else if (e.key === "-") {
+              if (document.getElementById("grid-overlay").classList.contains("open"))
+                setGridSize(gridItemSize - GRID_SIZE_STEP);
             }
           };
           render();
         } else {
           document.querySelector(".page-num").style.display = "none";
+          window.onkeydown = (e) => {
+            if (e.key === "+" || e.key === "=") {
+              setGridSize(gridItemSize + GRID_SIZE_STEP);
+            } else if (e.key === "-") {
+              setGridSize(gridItemSize - GRID_SIZE_STEP);
+            }
+          };
           openGrid();
         }
 
