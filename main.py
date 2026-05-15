@@ -93,7 +93,7 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     return f"{out_path_name}/{file.name}"
 
 
-def resize_job(target: str):
+def resize_job(target: str, resize: bool):
     target_path = pathlib.Path(target)
     images_files = get_image_files(target_path)
 
@@ -102,7 +102,7 @@ def resize_job(target: str):
         f"{THUMBNAIL_PATH}/{file.name}" for file in images_files
     ]
 
-    if images_files and not (target_path / RESIZED_PATH).exists():
+    if resize and images_files and not (target_path / RESIZED_PATH).exists():
         (target_path / RESIZED_PATH).mkdir(parents=True, exist_ok=True)
         resized_images = resize_images(images_files, RESIZED_PATH, 2160)
     else:
@@ -146,10 +146,10 @@ def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
     ]
 
 
-def recursive_resize_job(target: str):
-    resize_job(target)
+def recursive_resize_job(target: str, resize: bool):
+    resize_job(target, resize)
     for sub_dir in get_immediate_sub_dirs(pathlib.Path(target)):
-        recursive_resize_job(str(sub_dir))
+        recursive_resize_job(str(sub_dir), resize)
 
 
 def main():
@@ -184,9 +184,9 @@ def main():
         return
 
     if args.recursive:
-        recursive_resize_job(args.target)
+        recursive_resize_job(args.target, args.resize)
     else:
-        resize_job(args.target)
+        resize_job(args.target, args.resize)
 
 
 if __name__ == "__main__":
