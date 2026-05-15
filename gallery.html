@@ -234,26 +234,31 @@
       const folderList = typeof folders !== "undefined" ? folders : [];
 
       function init() {
-        window.onkeydown = (e) => {
-          if (e.key === "PageDown") {
-            index = Math.min(index + 1, total - 1);
-            render();
-          } else if (e.key === "PageUp") {
-            index = Math.max(index - 1, 0);
-            render();
-          } else if (e.key === "Home") {
-            index = 0;
-            render();
-          } else if (e.key === "End") {
-            index = total - 1;
-            render();
-          } else if (e.key === "Escape") {
-            closeGrid();
-          }
-        };
+        if (total > 0) {
+          window.onkeydown = (e) => {
+            if (e.key === "PageDown") {
+              index = Math.min(index + 1, total - 1);
+              render();
+            } else if (e.key === "PageUp") {
+              index = Math.max(index - 1, 0);
+              render();
+            } else if (e.key === "Home") {
+              index = 0;
+              render();
+            } else if (e.key === "End") {
+              index = total - 1;
+              render();
+            } else if (e.key === "Escape") {
+              closeGrid();
+            }
+          };
+          render();
+        } else {
+          document.querySelector(".page-num").style.display = "none";
+          openGrid();
+        }
 
         renderGrid();
-        render();
 
         document.getElementById("btnGrid").addEventListener("click", openGrid);
         document.getElementById("btnCloseGrid").addEventListener("click", closeGrid);
@@ -263,6 +268,7 @@
       }
 
       function render() {
+        if (total === 0) return;
         document.getElementById("pageNum").innerText = `${index + 1}/${total}`;
         document.getElementById("mainImg").src = files[index].resized;
 
