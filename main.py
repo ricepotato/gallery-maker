@@ -119,7 +119,10 @@ def resize_job(target: str):
 
 def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
     excluded = {RESIZED_PATH, THUMBNAIL_PATH}
-    return [x for x in target.iterdir() if x.is_dir() and x.name not in excluded]
+    return [
+        x for x in target.iterdir()
+        if x.is_dir() and x.name not in excluded and not x.name.startswith(".")
+    ]
 
 
 def recursive_resize_job(target: str):
