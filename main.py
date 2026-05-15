@@ -6,7 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 from PIL import Image
 
 RESIZED_PATH = "resized"
-THUMBNAIL_PATH = "thumbnails"
+THUMBNAIL_PATH = ".thumbnails"
 
 MAX_WORKERS = 10
 
