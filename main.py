@@ -87,22 +87,17 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
 
 
 def resize_job(target: str):
-    images_files = get_image_files(pathlib.Path(target))
+    target_path = pathlib.Path(target)
+    images_files = get_image_files(target_path)
 
-    resized_path = pathlib.Path(target) / RESIZED_PATH
-    if not resized_path.exists():
-        resized_path.mkdir(parents=True)
+    resized_images: list[str] = []
+    thumbnail_images: list[str] = []
 
-    thumbnail_path = pathlib.Path(target) / THUMBNAIL_PATH
-    if not thumbnail_path.exists():
-        thumbnail_path.mkdir(parents=True)
-
-    resized_images = resize_images(images_files, RESIZED_PATH, 2160)
-    thumbnail_images = resize_images(images_files, THUMBNAIL_PATH, 250)
-
-    if len(resized_images) <= 0:
-        print(f"No resized images found in {target}")
-        return
+    if images_files:
+        (target_path / RESIZED_PATH).mkdir(parents=True, exist_ok=True)
+        (target_path / THUMBNAIL_PATH).mkdir(parents=True, exist_ok=True)
+        resized_images = resize_images(images_files, RESIZED_PATH, 2160)
+        thumbnail_images = resize_images(images_files, THUMBNAIL_PATH, 250)
 
     file_names = [
         FilenameObject(resized_filepath, thumbnail_filepath, original_filepath.name)
@@ -111,11 +106,15 @@ def resize_job(target: str):
         )
     ]
 
-    sub_dirs = get_immediate_sub_dirs(pathlib.Path(target))
+    sub_dirs = get_immediate_sub_dirs(target_path)
     folder_names = [d.name for d in sorted(sub_dirs)]
 
-    dumps_js(file_names, folder_names, pathlib.Path(target) / "files.js")
-    cp_index(pathlib.Path(target))
+    if not file_names and not folder_names:
+        print(f"No images or subdirectories found in {target}")
+        return
+
+    dumps_js(file_names, folder_names, target_path / "files.js")
+    cp_index(target_path)
 
 
 def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
@@ -123,18 +122,10 @@ def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
     return [x for x in target.iterdir() if x.is_dir() and x.name not in excluded]
 
 
-def get_sub_dirs(target: str):
-    target_path = pathlib.Path(target)
-    return list(filter(lambda x: x.is_dir(), target_path.glob("**/*")))
-
-
 def recursive_resize_job(target: str):
-    target_path = pathlib.Path(target)
-    # resize_job(target)
-
-    sub_dirs = get_sub_dirs(target)
-    # for sub_dir in sub_dirs:
-    #     resize_job(str(sub_dir))
+    resize_job(target)
+    for sub_dir in get_immediate_sub_dirs(pathlib.Path(target)):
+        recursive_resize_job(str(sub_dir))
 
 
 def main():
@@ -162,7 +153,10 @@ def main():
         print(f"Target {args.target} is not a directory")
         return
 
-    resize_job(args.target)
+    if args.recursive:
+        recursive_resize_job(args.target)
+    else:
+        resize_job(args.target)
 
 
 if __name__ == "__main__":
