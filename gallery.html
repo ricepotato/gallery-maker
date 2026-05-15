@@ -40,47 +40,80 @@
         justify-content: center;
         align-items: center;
       }
-      #thumbnail-container {
+      #btnGrid {
         position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        height: 350px;
-        background-color: rgba(255, 255, 255, 0.3);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border-top: 1px solid rgba(255, 255, 255, 0.5);
-        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
-      }
-      #thumbnail-list {
-        list-style: none;
+        bottom: 16px;
+        right: 16px;
+        width: 50px;
+        height: 50px;
+        background-color: rgba(80, 80, 80, 0.85);
+        color: white;
+        font-size: 22px;
+        cursor: pointer;
+        border-radius: 6px;
         display: flex;
+        justify-content: center;
         align-items: center;
-        gap: 6px;
-        overflow-x: scroll;
-        height: 300px;
       }
-      #thumbnail-container-header {
+
+      /* Full-screen grid overlay */
+      #grid-overlay {
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.92);
+        z-index: 100;
+        display: none;
+        flex-direction: column;
+      }
+      #grid-overlay.open {
+        display: flex;
+      }
+      #grid-header {
         height: 50px;
         display: flex;
         justify-content: flex-end;
         align-items: center;
+        padding: 0 16px;
+        flex-shrink: 0;
       }
-      #btnThumbnail {
-        width: 50px;
-        height: 50px;
-        background-color: gray;
+      #btnCloseGrid {
+        width: 44px;
+        height: 44px;
+        background-color: rgba(80, 80, 80, 0.85);
         color: white;
+        font-size: 22px;
         cursor: pointer;
+        border-radius: 6px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
       }
-      #thumbnail-list img {
+      #grid-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px 12px 12px;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 6px;
+        align-content: start;
+      }
+      #grid-list .grid-item {
+        aspect-ratio: 1;
+        overflow: hidden;
         cursor: pointer;
-        border: 2px solid transparent;
-        transition: border-color 0.3s ease;
+        border: 3px solid transparent;
+        border-radius: 4px;
+        transition: border-color 0.2s ease;
       }
-      #thumbnail-list img.active {
+      #grid-list .grid-item.active {
         border-color: #ffffff;
-        box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+      }
+      #grid-list .grid-item img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
       }
     </style>
   </head>
@@ -88,114 +121,89 @@
     <div id="screen">
       <img id="mainImg" class="img-main" />
       <div class="page-num"><span id="pageNum">1</span></div>
-      <div id="thumbnail-container">
-        <div id="thumbnail-container-header"></div>
-        <ul id="thumbnail-list"></ul>
-      </div>
+      <button id="btnGrid" title="그리드 보기">⊞</button>
     </div>
+
+    <!-- Full-screen grid overlay -->
+    <div id="grid-overlay">
+      <div id="grid-header">
+        <button id="btnCloseGrid" title="닫기">✕</button>
+      </div>
+      <div id="grid-list"></div>
+    </div>
+
     <script src="files.js"></script>
     <script>
       let index = 0;
-      let isThumbnailOpen = false;
       const total = files.length;
+
       function init() {
         window.onkeydown = (e) => {
-          if (e.key == "PageDown") {
-            index += 1;
-            if (total - 1 <= index) {
-              index = total - 1;
-            }
-          }
-          if (e.key == "Home") {
+          if (e.key === "PageDown") {
+            index = Math.min(index + 1, total - 1);
+            render();
+          } else if (e.key === "PageUp") {
+            index = Math.max(index - 1, 0);
+            render();
+          } else if (e.key === "Home") {
             index = 0;
+            render();
+          } else if (e.key === "End") {
+            index = total - 1;
+            render();
+          } else if (e.key === "Escape") {
+            closeGrid();
           }
-          if (e.key == "End") {
-            index = files.length - 1;
-          }
-          if (e.key == "PageUp") {
-            index -= 1;
-            if (index <= 0) {
-              index = 0;
-            }
-          }
-          render();
         };
 
+        renderGrid();
         render();
-        renderThumbnails();
-        const button = toogleButton();
-        document
-          .getElementById("thumbnail-container-header")
-          .appendChild(button);
-      }
 
-      function pageDown() {
-        index += 1;
+        document.getElementById("btnGrid").addEventListener("click", openGrid);
+        document.getElementById("btnCloseGrid").addEventListener("click", closeGrid);
       }
 
       function render() {
-        document.getElementById("pageNum").innerText = `${
-          parseInt(index) + 1
-        }/${total}`;
+        document.getElementById("pageNum").innerText = `${index + 1}/${total}`;
         document.getElementById("mainImg").src = files[index].resized;
 
-        // Update thumbnail active state
-        const thumbnails = document.querySelectorAll("#thumbnail-list img");
-        thumbnails.forEach((thumb, i) => {
-          if (i === index) {
-            thumb.classList.add("active");
-          } else {
-            thumb.classList.remove("active");
-          }
+        document.querySelectorAll("#grid-list .grid-item").forEach((item, i) => {
+          item.classList.toggle("active", i === index);
         });
       }
 
-      function renderThumbnails() {
-        const thumbnailImages = files.map((file) =>
-          thumbnailImage(file.thumbnail)
-        );
-        const thumbnailList = document.getElementById("thumbnail-list");
+      function renderGrid() {
+        const gridList = document.getElementById("grid-list");
+        files.forEach((file, i) => {
+          const div = document.createElement("div");
+          div.className = "grid-item";
 
-        for (let i = 0; i < thumbnailImages.length; i++) {
-          const li = document.createElement("li");
-          li.appendChild(thumbnailImages[i]);
-          li.addEventListener("click", () => {
+          const img = new Image();
+          img.src = file.thumbnail;
+          img.alt = file.original;
+
+          div.appendChild(img);
+          div.addEventListener("click", () => {
             index = i;
             render();
+            closeGrid();
           });
-          thumbnailList.appendChild(li);
-        }
+
+          gridList.appendChild(div);
+        });
       }
 
-      function thumbnailImage(thumbnail) {
-        const img = new Image();
-        img.src = thumbnail;
-        img.alt = thumbnail;
-        return img;
+      function openGrid() {
+        document.getElementById("grid-overlay").classList.add("open");
+        // scroll active item into view
+        const active = document.querySelector("#grid-list .grid-item.active");
+        if (active) active.scrollIntoView({ block: "center" });
       }
 
-      function toogleButton() {
-        const button = document.createElement("button");
-        button.innerText = "닫기";
-        button.id = "btnThumbnail";
-
-        function hideThumbnail() {
-          document.getElementById("thumbnail-container").style.bottom =
-            "-300px";
-          button.removeEventListener("click", hideThumbnail);
-          button.addEventListener("click", showThumbnail);
-          button.innerText = "열기";
-        }
-
-        function showThumbnail() {
-          document.getElementById("thumbnail-container").style.bottom = "0px";
-          button.removeEventListener("click", showThumbnail);
-          button.addEventListener("click", hideThumbnail);
-          button.innerText = "닫기";
-        }
-        button.addEventListener("click", hideThumbnail);
-        return button;
+      function closeGrid() {
+        document.getElementById("grid-overlay").classList.remove("open");
       }
+
       init();
     </script>
   </body>
