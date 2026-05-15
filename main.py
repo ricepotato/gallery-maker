@@ -1,4 +1,5 @@
 import argparse
+import json
 import pathlib
 import shutil
 import logging
@@ -24,7 +25,7 @@ class FilenameObject:
 
 
 def dumps_js(
-    filenames: list[FilenameObject], folders: list[str], outpath: pathlib.Path
+    filenames: list[FilenameObject], folders: list[dict], outpath: pathlib.Path
 ):
     with open(outpath, "w", encoding="utf-8") as f:
         f.write("const files = [\n")
@@ -37,7 +38,7 @@ def dumps_js(
         f.write("\n];\n")
         f.write("const folders = [\n")
         for i, folder in enumerate(folders):
-            f.write(f'"{folder}"')
+            f.write(json.dumps(folder, ensure_ascii=False))
             if i != len(folders) - 1:
                 f.write(",\n")
         f.write("\n];")
@@ -127,13 +128,23 @@ def resize_job(target: str, resize: bool):
     ]
 
     sub_dirs = get_immediate_sub_dirs(target_path)
-    folder_names = [d.name for d in sorted(sub_dirs)]
+    folder_data = []
+    for d in sorted(sub_dirs):
+        thumb_dir = d / THUMBNAIL_PATH
+        thumbnails = []
+        if thumb_dir.exists():
+            thumb_files = sorted(
+                f for f in thumb_dir.iterdir()
+                if f.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp"]
+            )[:4]
+            thumbnails = [f"{d.name}/{THUMBNAIL_PATH}/{f.name}" for f in thumb_files]
+        folder_data.append({"name": d.name, "thumbnails": thumbnails})
 
-    if not file_names and not folder_names:
+    if not file_names and not folder_data:
         log.info(f"No images or subdirectories found in {target}")
         return
 
-    dumps_js(file_names, folder_names, target_path / "files.js")
+    dumps_js(file_names, folder_data, target_path / "files.js")
     cp_index(target_path)
 
 
