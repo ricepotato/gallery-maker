@@ -18,14 +18,20 @@ class FilenameObject:
         self.original = original
 
 
-def dumps_js(filenames: list[FilenameObject], outpath: pathlib.Path):
+def dumps_js(filenames: list[FilenameObject], folders: list[str], outpath: pathlib.Path):
     with open(outpath, "w", encoding="utf-8") as f:
         f.write("const files = [\n")
-        for filename in filenames:
+        for i, filename in enumerate(filenames):
             f.write(
                 f'{{"resized": "{filename.resized}", "thumbnail": "{filename.thumbnail}", "original": "{filename.original}"}}'
             )
-            if filename != filenames[-1]:
+            if i != len(filenames) - 1:
+                f.write(",\n")
+        f.write("\n];\n")
+        f.write("const folders = [\n")
+        for i, folder in enumerate(folders):
+            f.write(f'"{folder}"')
+            if i != len(folders) - 1:
                 f.write(",\n")
         f.write("\n];")
 
@@ -105,8 +111,16 @@ def resize_job(target: str):
         )
     ]
 
-    dumps_js(file_names, pathlib.Path(target) / "files.js")
+    sub_dirs = get_immediate_sub_dirs(pathlib.Path(target))
+    folder_names = [d.name for d in sorted(sub_dirs)]
+
+    dumps_js(file_names, folder_names, pathlib.Path(target) / "files.js")
     cp_index(pathlib.Path(target))
+
+
+def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
+    excluded = {RESIZED_PATH, THUMBNAIL_PATH}
+    return [x for x in target.iterdir() if x.is_dir() and x.name not in excluded]
 
 
 def get_sub_dirs(target: str):
