@@ -1,6 +1,7 @@
 import argparse
 import pathlib
 import shutil
+import logging
 from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
@@ -9,6 +10,10 @@ RESIZED_PATH = ".resized"
 THUMBNAIL_PATH = ".thumbnails"
 
 MAX_WORKERS = 10
+
+log = logging.getLogger()
+log.addHandler(logging.StreamHandler())
+log.setLevel(logging.INFO)
 
 
 class FilenameObject:
@@ -69,12 +74,12 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     out_path = file.parent / out_path_name
     out_filepath = out_path / file.name
     if out_filepath.exists():
-        print(f"Skipping {file.name} because it already exists")
+        log.info(f"Skipping {file.name} because it already exists")
         return f"{out_path_name}/{file.name}"
 
     img = Image.open(file)
     if img.size[1] < height:
-        print(f"Skipping {file.name} because it is smaller than {height}")
+        log.info(f"Skipping {file.name} because it is smaller than {height}")
         return file.name
     # Calculate width to maintain aspect ratio
     ratio = height / img.size[1]
@@ -83,28 +88,36 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
     resized_image = img.resize((width, height), Image.Resampling.LANCZOS)
     # Save with high quality
     resized_image.save(out_path / file.name, quality=95, optimize=True)
-    print(f"Resized {file.name} to {out_path / file.name}")
+    log.info(f"Resized {file.name} to {out_path / file.name}")
 
     return f"{out_path_name}/{file.name}"
 
 
 def resize_job(target: str):
     target_path = pathlib.Path(target)
-
-    if (target_path / RESIZED_PATH).exists() and (target_path / THUMBNAIL_PATH).exists():
-        print(f"Skipping {target}: .resized and .thumbnails already exist")
-        return
-
     images_files = get_image_files(target_path)
 
-    resized_images: list[str] = []
-    thumbnail_images: list[str] = []
+    resized_images: list[str] = [f"{RESIZED_PATH}/{file.name}" for file in images_files]
+    thumbnail_images: list[str] = [
+        f"{THUMBNAIL_PATH}/{file.name}" for file in images_files
+    ]
 
-    if images_files:
+    if images_files and not (target_path / RESIZED_PATH).exists():
         (target_path / RESIZED_PATH).mkdir(parents=True, exist_ok=True)
-        (target_path / THUMBNAIL_PATH).mkdir(parents=True, exist_ok=True)
         resized_images = resize_images(images_files, RESIZED_PATH, 2160)
+    else:
+        log.info(
+            f"Resized images already exist in {target_path / RESIZED_PATH}, skipping resizing."
+        )
+        resized_images = [f"{file.name}" for file in images_files]
+
+    if images_files and not (target_path / THUMBNAIL_PATH).exists():
+        (target_path / THUMBNAIL_PATH).mkdir(parents=True, exist_ok=True)
         thumbnail_images = resize_images(images_files, THUMBNAIL_PATH, 250)
+    else:
+        log.info(
+            f"Thumbnail images already exist in {target_path / THUMBNAIL_PATH}, skipping resizing."
+        )
 
     file_names = [
         FilenameObject(resized_filepath, thumbnail_filepath, original_filepath.name)
@@ -117,7 +130,7 @@ def resize_job(target: str):
     folder_names = [d.name for d in sorted(sub_dirs)]
 
     if not file_names and not folder_names:
-        print(f"No images or subdirectories found in {target}")
+        log.info(f"No images or subdirectories found in {target}")
         return
 
     dumps_js(file_names, folder_names, target_path / "files.js")
@@ -140,7 +153,7 @@ def recursive_resize_job(target: str):
 
 
 def main():
-    print("Hello, Gallery Maker!")
+    log.info("Hello, Gallery Maker!")
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -153,15 +166,21 @@ def main():
         default=False,
         action="store_true",
     )
+    parser.add_argument(
+        "--resize",
+        help="Resize images",
+        default=False,
+        action="store_true",
+    )
 
     args = parser.parse_args()
 
     if not pathlib.Path(args.target).exists():
-        print(f"Target directory {args.target} does not exist")
+        log.info(f"Target directory {args.target} does not exist")
         return
 
     if not pathlib.Path(args.target).is_dir():
-        print(f"Target {args.target} is not a directory")
+        log.info(f"Target {args.target} is not a directory")
         return
 
     if args.recursive:
