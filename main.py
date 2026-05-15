@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 from PIL import Image
 
-RESIZED_PATH = "resized"
+RESIZED_PATH = ".resized"
 THUMBNAIL_PATH = ".thumbnails"
 
 MAX_WORKERS = 10
@@ -18,7 +18,9 @@ class FilenameObject:
         self.original = original
 
 
-def dumps_js(filenames: list[FilenameObject], folders: list[str], outpath: pathlib.Path):
+def dumps_js(
+    filenames: list[FilenameObject], folders: list[str], outpath: pathlib.Path
+):
     with open(outpath, "w", encoding="utf-8") as f:
         f.write("const files = [\n")
         for i, filename in enumerate(filenames):
@@ -88,6 +90,11 @@ def resize_image(file: pathlib.Path, out_path_name: str, height: int):
 
 def resize_job(target: str):
     target_path = pathlib.Path(target)
+
+    if (target_path / RESIZED_PATH).exists() and (target_path / THUMBNAIL_PATH).exists():
+        print(f"Skipping {target}: .resized and .thumbnails already exist")
+        return
+
     images_files = get_image_files(target_path)
 
     resized_images: list[str] = []
@@ -120,7 +127,8 @@ def resize_job(target: str):
 def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
     excluded = {RESIZED_PATH, THUMBNAIL_PATH}
     return [
-        x for x in target.iterdir()
+        x
+        for x in target.iterdir()
         if x.is_dir() and x.name not in excluded and not x.name.startswith(".")
     ]
 
