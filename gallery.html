@@ -144,7 +144,7 @@
         flex: 1;
         padding: 8px 12px 12px;
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(var(--grid-item-size, 180px), 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(var(--grid-item-size, 260px), 1fr));
         gap: 6px;
         align-content: start;
       }
@@ -273,10 +273,10 @@
       const total = files.length;
       const folderList = typeof folders !== "undefined" ? folders : [];
 
-      const GRID_SIZE_MIN = 80;
-      const GRID_SIZE_MAX = 400;
+      const GRID_SIZE_MIN = 100;
+      const GRID_SIZE_MAX = 600;
       const GRID_SIZE_STEP = 30;
-      let gridItemSize = 180;
+      let gridItemSize = 260;
 
       function setGridSize(size) {
         gridItemSize = Math.min(GRID_SIZE_MAX, Math.max(GRID_SIZE_MIN, size));
@@ -318,10 +318,11 @@
               setGridSize(gridItemSize - GRID_SIZE_STEP);
             }
           };
-          openGrid();
         }
 
         renderGrid();
+        // 폴더 진입 시 기본으로 목록을 보여준다
+        openGrid();
 
         document.getElementById("btnGrid").addEventListener("click", openGrid);
         document

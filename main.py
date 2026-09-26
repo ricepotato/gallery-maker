@@ -51,7 +51,7 @@ def cp_index(path: pathlib.Path):
 def get_image_files(target_path: pathlib.Path):
     return list(
         filter(
-            lambda x: x.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp"],
+            lambda x: x.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp", ".gif"],
             target_path.glob("*"),
         )
     )
@@ -130,14 +130,7 @@ def resize_job(target: str, resize: bool):
     sub_dirs = get_immediate_sub_dirs(target_path)
     folder_data = []
     for d in sorted(sub_dirs):
-        thumb_dir = d / THUMBNAIL_PATH
-        thumbnails = []
-        if thumb_dir.exists():
-            thumb_files = sorted(
-                f for f in thumb_dir.iterdir()
-                if f.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp"]
-            )[:4]
-            thumbnails = [f"{d.name}/{THUMBNAIL_PATH}/{f.name}" for f in thumb_files]
+        thumbnails = collect_folder_thumbnails(d, target_path, 4)
         folder_data.append({"name": d.name, "thumbnails": thumbnails})
 
     if not file_names and not folder_data:
@@ -146,6 +139,33 @@ def resize_job(target: str, resize: bool):
 
     dumps_js(file_names, folder_data, target_path / "files.js")
     cp_index(target_path)
+
+
+def collect_folder_thumbnails(
+    folder: pathlib.Path, base: pathlib.Path, limit: int
+) -> list[str]:
+    """
+    폴더의 썸네일 경로 목록을 반환. 폴더에 이미지가 없으면 하위 폴더에서 찾는다.
+    """
+    thumb_dir = folder / THUMBNAIL_PATH
+    if thumb_dir.exists():
+        files = sorted(
+            f
+            for f in thumb_dir.iterdir()
+            if f.suffix.lower() in [".jpg", ".png", ".jpeg", ".tiff", ".webp", ".gif"]
+        )
+    else:
+        files = sorted(get_image_files(folder))
+
+    result = [f.relative_to(base).as_posix() for f in files[:limit]]
+    if result:
+        return result
+
+    for sub_dir in sorted(get_immediate_sub_dirs(folder)):
+        result += collect_folder_thumbnails(sub_dir, base, limit - len(result))
+        if len(result) >= limit:
+            break
+    return result
 
 
 def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
@@ -158,9 +178,10 @@ def get_immediate_sub_dirs(target: pathlib.Path) -> list[pathlib.Path]:
 
 
 def recursive_resize_job(target: str, resize: bool):
-    resize_job(target, resize)
+    # 하위 폴더를 먼저 처리해야 상위 폴더에서 하위 폴더의 썸네일을 사용할 수 있다
     for sub_dir in get_immediate_sub_dirs(pathlib.Path(target)):
         recursive_resize_job(str(sub_dir), resize)
+    resize_job(target, resize)
 
 
 def main():
